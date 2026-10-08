@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+ROOT="${SHM_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/shm}"
+PLUGINS="$ROOT/plugins"
+mkdir -p "$PLUGINS"
+
+if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+  RESET=$'\e[0m'; BOLD=$'\e[1m'; DIM=$'\e[2m'; PURPLE=$'\e[35m'; BLUE=$'\e[34m'; GREEN=$'\e[32m'; RED=$'\e[31m'; MUTED=$'\e[2m'; BG=$'\e[7m'
+else
+  RESET=''; BOLD=''; DIM=''; PURPLE=''; BLUE=''; GREEN=''; RED=''; MUTED=''; BG=''
+fi
+
+meta() {
+  local file="$1" key="$2" line
+  [[ -f "$file" ]] || return 0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" == "$key="* ]] || continue
+    printf '%s' "${line#*=}"
+    return 0
+  done < "$file"
+}
+
+valid_id() { [[ "$1" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]]; }
+valid_entry() { [[ "$1" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.sh$ && "$1" != *..* ]]; }
+
+scan() {
+  IDS=()
+  local dir id entry
+  for dir in "$PLUGINS"/*; do
+    [[ -d "$dir" && ! -L "$dir" && -f "$dir/plugin.conf" && ! -L "$dir/plugin.conf" ]] || continue
+    id="${dir##*/}"
+    valid_id "$id" || continue
+    entry="$(meta "$dir/plugin.conf" entry)"
+    [[ -n "$entry" ]] || entry='main.sh'
+    valid_entry "$entry" || continue
+    [[ -f "$dir/$entry" && ! -L "$dir/$entry" ]] || continue
+    IDS+=("$id")
+  done
+  if (( ${#IDS[@]} )); then
+    mapfile -d '' -t IDS < <(
+      for id in "${IDS[@]}"; do
+        printf '%s\t%s\0' "$(meta "$PLUGINS/$id/plugin.conf" name)" "$id"
+      done | LC_ALL=C.UTF-8 sort -z -f | while IFS=$'\t' read -r -d '' name id; do
+        printf '%s\0' "$id"
+      done
+    )
+  fi
+}
+
+contains() {
+  local item
+  for item in "${IDS[@]}"; do [[ "$item" == "$1" ]] && return 0; done
+  return 1
+}
+
+field() {
+  local value
+  value="$(meta "$PLUGINS/$1/plugin.conf" "$2")"
+  printf '%s' "${value:-${3:-—}}"
+}
+
+info() {
+  local id="$1"
+  contains "$id" || { printf '%sПлагин не найден: %s%s\n' "$RED" "$id" "$RESET"; return 1; }
+  printf '\n%s%s  %s%s\n' "$PURPLE" "$BOLD" "$(field "$id" name "$id")" "$RESET"
+  printf '%s  ──────────────────────────────────────%s\n' "$MUTED" "$RESET"
+  printf '  %-13s %s\n' 'ID' "$id"
+  printf '  %-13s %s\n' 'Описание' "$(field "$id" description)"
+  printf '  %-13s %s\n' 'Автор' "$(field "$id" author)"
+  printf '  %-13s %s\n' 'Категория' "$(field "$id" category)"
+  printf '  %-13s %s\n\n' 'Путь' "$PLUGINS/$id"
+}
+
+run_plugin() {
+  local id="$1" entry status
+  shift
+  contains "$id" || { printf '%sПлагин не найден: %s%s\n' "$RED" "$id" "$RESET"; return 1; }
+  entry="$(field "$id" entry main.sh)"
+  printf '\n%s  ❯ %s%s\n\n' "$PURPLE" "$(field "$id" name "$id")" "$RESET"
+  bash "$PLUGINS/$id/$entry" "$@"
+  status=$?
+  if (( status == 0 )); then
+    printf '\n%s  ✓ Выполнено%s\n' "$GREEN" "$RESET"
+  else
+    printf '\n%s  ✗ Ошибка (код %d)%s\n' "$RED" "$status" "$RESET"
+  fi
+  return "$status"
+}
+
+remove_plugin() {
+  local id="$1" answer
+  contains "$id" || { printf 'Плагин не найден: %s\n' "$id" >&2; return 1; }
+  [[ -d "$PLUGINS/$id" && ! -L "$PLUGINS/$id" ]] || return 1
+  printf 'Удалить плагин «%s» со всеми файлами? [y/N] ' "$(field "$id" name "$id")"
+  IFS= read -r answer || return 1
+  [[ "$answer" =~ ^[yYдД]$ ]] || { echo 'Отменено.'; return 0; }
+  rm -rf -- "$PLUGINS/$id"
+  printf 'Плагин удалён: %s\n' "$id"
+}
+
+list() {
+  local i=0 id
+  printf '\n%s%s  SHM%s %s· shell manager%s\n\n' "$PURPLE" "$BOLD" "$RESET" "$MUTED" "$RESET"
+  if (( ${#IDS[@]} == 0 )); then printf '  Нет плагинов в %s\n' "$PLUGINS"; return; fi
+  for id in "${IDS[@]}"; do
+    ((i+=1))
+    printf '  %s%02d%s  %-24s %s\n' "$PURPLE" "$i" "$RESET" "$(field "$id" name "$id")" "$(field "$id" description '')"
+  done
+  printf '\n'
+}
+
+paint() {
+  local index="$1" i id marker
+  printf '\e[H\e[2J'
+  printf '\n  %s%s╭─────────────────────────────────────────────────╮%s\n' "$PURPLE" "$BOLD" "$RESET"
+  printf '  %s%s│%s   %s%s❯ SHM%s   %s/ shell manager%s                      %s%s│%s\n' "$PURPLE" "$BOLD" "$RESET" "$PURPLE" "$BOLD" "$RESET" "$MUTED" "$RESET" "$PURPLE" "$BOLD" "$RESET"
+  printf '  %s%s╰─────────────────────────────────────────────────╯%s\n' "$PURPLE" "$BOLD" "$RESET"
+  printf '\n  %sПЛАГИНЫ%s  %s%02d установлено%s\n\n' "$MUTED" "$RESET" "$PURPLE" "${#IDS[@]}" "$RESET"
+  if (( ${#IDS[@]} == 0 )); then
+    printf '  %sНет установленных плагинов%s\n' "$MUTED" "$RESET"
+  fi
+  for ((i=0; i<${#IDS[@]}; i++)); do
+    id="${IDS[i]}"
+    if (( i == index )); then
+      printf '  %s%s  ❯  %s%s  %s%s\n' "$BG" "$PURPLE" "$(field "$id" name "$id")" "$RESET" "$MUTED" "$RESET"
+    else
+      printf '     %s○%s  %s\n' "$MUTED" "$RESET" "$(field "$id" name "$id")"
+    fi
+    printf '         %s%s  · %s%s\n\n' "$MUTED" "$(field "$id" category)" "$(field "$id" description)" "$RESET"
+  done
+  printf '  %s─────────────────────────────────────────────────%s\n' "$MUTED" "$RESET"
+  printf '  %s↑↓%s выбор    %sEnter%s запуск    %si%s информация    %sr%s обновить    %sq%s выход\n\n' "$PURPLE" "$RESET" "$PURPLE" "$RESET" "$PURPLE" "$RESET" "$PURPLE" "$RESET" "$PURPLE" "$RESET"
+}
+
+pause() { printf '\n%s  Нажми Enter, чтобы вернуться в меню...%s' "$MUTED" "$RESET"; IFS= read -r _ || true; }
+
+menu() {
+  [[ -t 0 && -t 1 ]] || { list; return 0; }
+  local selected=0 key extra id
+  while true; do
+    scan
+    (( selected < ${#IDS[@]} )) || selected=0
+    paint "$selected"
+    IFS= read -rsn1 key || break
+    if [[ "$key" == $'\e' ]]; then
+      IFS= read -rsn1 -t 0.2 extra || continue
+      if [[ "$extra" == '[' ]]; then
+        IFS= read -rsn1 -t 0.2 extra || continue
+        case "$extra" in
+          A) (( ${#IDS[@]} > 0 )) && selected=$(( (selected-1+${#IDS[@]}) % ${#IDS[@]} )) ;;
+          B) (( ${#IDS[@]} > 0 )) && selected=$(( (selected+1) % ${#IDS[@]} )) ;;
+        esac
+      fi
+      continue
+    fi
+    case "$key" in
+      q|Q) break ;;
+      r|R) continue ;;
+      i|I)
+        (( ${#IDS[@]} > 0 )) || continue
+        printf '\e[H\e[2J'
+        info "${IDS[selected]}"
+        pause
+        ;;
+      '')
+        (( ${#IDS[@]} > 0 )) || continue
+        id="${IDS[selected]}"
+        printf '\e[H\e[2J'
+        run_plugin "$id" || true
+        pause
+        ;;
+    esac
+  done
+  printf '\e[H\e[2J'
+}
+
+scan
+case "${1:-}" in
+  '') menu ;;
+  list) list ;;
+  info) [[ $# -ge 2 ]] || { echo 'Использование: shm info <id>'; exit 2; }; info "$2" ;;
+  remove) [[ $# -ge 2 ]] || { echo 'Использование: shm remove <id>'; exit 2; }; remove_plugin "$2" ;;
+  run) [[ $# -ge 2 ]] || { echo 'Использование: shm run <id> [аргументы]'; exit 2; }; shift; id="$1"; shift; run_plugin "$id" "$@" ;;
+  help|-h|--help)
+    printf 'shm                   Интерактивное меню\nshm list              Список плагинов\nshm info <id>         Информация о плагине\nshm run <id> [args]   Запустить плагин\nshm remove <id>       Удалить плагин\n' ;;
+  *) echo 'Неизвестная команда. Используй: shm help'; exit 2 ;;
+esac

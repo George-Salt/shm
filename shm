@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="${SHM_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/shm}"
+if [[ $# -eq 0 ]]; then
+  exec python3 "$ROOT/tui.py"
+fi
+exec bash "$ROOT/shm-cli" "$@"
