@@ -17,6 +17,7 @@ import fcntl
 import struct
 import collections
 from pathlib import Path
+from i18n import tr, get_language, set_language
 
 ROOT = Path(os.environ.get('SHM_HOME', str(Path(os.environ.get('XDG_DATA_HOME', str(Path.home() / '.local/share'))) / 'shm')))
 PLUGINS = ROOT / 'plugins'
@@ -61,7 +62,7 @@ def scan():
         script = folder / entry
         if script.is_symlink() or not script.is_file():
             continue
-        result.append({'id': folder.name, 'name': data.get('name', folder.name).strip(), 'description': data.get('description', 'Нет описания.').strip(), 'category': data.get('category', 'Другое').strip(), 'author': data.get('author', '—').strip(), 'script': script})
+        result.append({'id': folder.name, 'name': data.get('name.' + get_language(), data.get('name', folder.name)).strip(), 'description': data.get('description.' + get_language(), data.get('description', tr('Нет описания.'))).strip(), 'category': data.get('category.' + get_language(), data.get('category', tr('Другое'))).strip(), 'author': data.get('author', '—').strip(), 'script': script})
     return sorted(result, key=lambda x: (x['name'].casefold(), x['id']))
 
 
@@ -72,7 +73,7 @@ class UI:
         self.query = ''
         self.searching = False
         self.offset = 0
-        self.message = 'Готово'
+        self.message = tr('Готово') + ' · l: RU / EN'
         self.last_scan = time.monotonic()
         self.last_size = None
         self.dirty = True
@@ -124,7 +125,7 @@ class UI:
         h, w = self.size()
         self.clickmap = {}
         if w < 26 or h < 9:
-            self.write('\x1b[H\x1b[2J' + ACCENT + '❯ SHM' + RESET + '\r\nУвеличь терминал.\r\nq — выход')
+            self.write('\x1b[H\x1b[2J' + ACCENT + '❯ SHM' + RESET + '\r\n' + tr('Увеличь терминал.') + '\r\n' + tr('q — выход'))
             return
         wide = w >= 76
         left = min(42, max(32, w // 3)) if wide else w
@@ -139,11 +140,11 @@ class UI:
 
         line(0, 2, '❯ SHM  /  shell manager', ACCENT)
         if w > 54:
-            status = f'{len(self.items)} plugins'
+            status = f'{len(self.items)} {tr("плагинов")} · {get_language().upper()} [l]'
             line(0, w - len(status) - 2, status, MUTED)
         line(1, 2, '─' * (w - 4), MUTED)
-        line(2, 2, 'ПЛАГИНЫ', BOLD)
-        line(3, 2, '/ ' + (self.query if self.query else 'Поиск') + ('_' if self.searching else ''), MUTED, left - 4)
+        line(2, 2, tr('ПЛАГИНЫ'), BOLD)
+        line(3, 2, '/ ' + (self.query if self.query else tr('Поиск')) + ('_' if self.searching else ''), MUTED, left - 4)
         items = self.filtered()
         curr = self.current()
         if curr:
@@ -162,19 +163,19 @@ class UI:
             line(y, 2, ('❯ ' if focused else '  ') + item['name'], ACCENT if focused else '', left - 4)
             self.clickmap[y] = item['id']
         if not items:
-            line(5, 3, 'Плагины не найдены.', MUTED, left - 5)
+            line(5, 3, tr('Плагины не найдены.'), MUTED, left - 5)
         if wide:
             for y in range(2, h - 2):
                 line(y, left, '│', MUTED)
             x, width = left + 3, w - left - 5
-            line(2, x, 'ИНФОРМАЦИЯ', BOLD, width)
+            line(2, x, tr('ИНФОРМАЦИЯ'), BOLD, width)
             if curr:
                 line(4, x, curr['name'], ACCENT, width)
                 line(6, x, f'ID: {curr["id"]}', MUTED, width)
-                line(7, x, f'Категория: {curr["category"]}', MUTED, width)
-                line(8, x, f'Автор: {curr["author"]}', MUTED, width)
+                line(7, x, f'{tr("Категория:")} {curr["category"]}', MUTED, width)
+                line(8, x, f'{tr("Автор:")} {curr["author"]}', MUTED, width)
                 if h > 15:
-                    line(10, x, 'ОПИСАНИЕ', BOLD, width)
+                    line(10, x, tr('ОПИСАНИЕ'), BOLD, width)
                     desc = curr['description']
                     words = desc.split()
                     parts = []
@@ -190,11 +191,11 @@ class UI:
                     for y, para in enumerate(parts[:max(0, h - 15)], 12):
                         line(y, x, para, '', width)
         line(h - 3, 2, '─' * (w - 4), MUTED)
-        line(h - 2, 2, '↑↓ выбор  Enter запуск  d удалить  / поиск  r обновить  q выход' if w >= 78 else '↑↓ выбор  Enter  d удалить  / поиск  r  q' if w >= 48 else '↑↓ Enter d / r q', MUTED, w - 4)
+        line(h - 2, 2, tr('↑↓ выбор  Enter запуск  d удалить  / поиск  r обновить  l язык  q выход') if w >= 78 else tr('↑↓ выбор  Enter  d удалить  / поиск  r  q') if w >= 48 else tr('↑↓ Enter d / r q'), MUTED, w - 4)
         line(h - 1, 2, self.message, MUTED, w - 4)
         if self.confirm:
-            line(max(2, h // 2 - 2), max(2, (w - 48) // 2), 'Удалить выбранный плагин?', ACCENT, min(48, w - 4))
-            line(max(3, h // 2 - 1), max(2, (w - 48) // 2), 'y — удалить     n / Esc — отмена', BOLD, min(48, w - 4))
+            line(max(2, h // 2 - 2), max(2, (w - 48) // 2), tr('Удалить выбранный плагин?'), ACCENT, min(48, w - 4))
+            line(max(3, h // 2 - 1), max(2, (w - 48) // 2), tr('y — удалить     n / Esc — отмена'), BOLD, min(48, w - 4))
         output = '\x1b[0m\x1b[H\x1b[2J'
         for y, fragments in enumerate(canvas):
             if fragments:
@@ -204,19 +205,19 @@ class UI:
     def delete(self):
         item = self.current()
         if not item:
-            self.message = 'Нет выбранного плагина.'
+            self.message = tr('Нет выбранного плагина.')
             return
         folder = PLUGINS / item['id']
         try:
             if folder.is_symlink() or not folder.is_dir() or folder.resolve().parent != PLUGINS.resolve():
-                raise OSError('Некорректный путь плагина')
+                raise OSError(tr('Некорректный путь плагина'))
             shutil.rmtree(folder)
             self.items = scan()
             self.selected = self.items[0]['id'] if self.items else ''
             self.offset = 0
-            self.message = f'Удалён: {item["name"]}'
+            self.message = f'{tr("Удалён:")} {item["name"]}'
         except OSError as e:
-            self.message = f'Ошибка удаления: {e}'
+            self.message = f'{tr("Ошибка удаления:")} {e}'
 
     def run_plugin(self):
         item = self.current()
@@ -231,7 +232,7 @@ class UI:
         termios.tcsetattr(slave, termios.TCSANOW, slave_attrs)
         proc = None
         logs = collections.deque(maxlen=3500)
-        logs.append('Запуск плагина…')
+        logs.append(tr('Запуск плагина…'))
         current = ''
         partial_escape = ''
         pending_cr = False
@@ -301,13 +302,13 @@ class UI:
         def draw_runner():
             h, w = self.size()
             if h < 8 or w < 30:
-                self.write('\x1b[0m\x1b[H\x1b[2JУвеличь окно терминала.')
+                self.write('\x1b[0m\x1b[H\x1b[2J' + tr('Увеличь окно терминала.'))
                 return
             bar = '─' * (w - 4)
-            state = 'ГОТОВО' if status == 0 else 'ОШИБКА' if done else 'ВЫПОЛНЯЕТСЯ'
+            state = tr('ГОТОВО') if status == 0 else tr('ОШИБКА') if done else tr('ВЫПОЛНЯЕТСЯ')
             label = f'  ❯ SHM  /  {item["name"]}'
             output = ['\x1b[0m\x1b[H\x1b[2J', ACCENT, clip(label, w-2), RESET]
-            output += [f'\x1b[2;3H{MUTED}{bar}{RESET}', f'\x1b[3;3H{BOLD}ВЫВОД ПЛАГИНА{RESET}', f'\x1b[3;{max(3,w-len(state)-2)}H{ACCENT}{state}{RESET}']
+            output += [f'\x1b[2;3H{MUTED}{bar}{RESET}', f'\x1b[3;3H{BOLD}{tr("ВЫВОД ПЛАГИНА")}{RESET}', f'\x1b[3;{max(3,w-len(state)-2)}H{ACCENT}{state}{RESET}']
             visible = max(1, h-7)
             all_lines = list(logs) + ([current] if current else [])
             end = max(0, len(all_lines)-scroll)
@@ -315,10 +316,10 @@ class UI:
             for row, content in enumerate(all_lines[begin:end], 5):
                 output.append(f'\x1b[{row};3H{clip(content, w-4)}')
             output.append(f'\x1b[{h-2};3H{MUTED}{bar}{RESET}')
-            footer = 'Enter — вернуться   ↑↓/колесо — журнал   q — вернуться' if done else 'Плагин принимает ввод   Ctrl+C — прервать   PgUp/PgDn — журнал'
+            footer = tr('Enter — вернуться   ↑↓/колесо — журнал   q — вернуться') if done else tr('Плагин принимает ввод   Ctrl+C — прервать   PgUp/PgDn — журнал')
             output.append(f'\x1b[{h-1};3H{MUTED}{clip(footer, w-4)}{RESET}')
             if scroll:
-                output.append(f'\x1b[{h};3H{MUTED}Прокрутка: -{scroll} строк{RESET}')
+                output.append(f'\x1b[{h};3H{MUTED}{tr("Прокрутка:")} -{scroll} {tr("строк")}{RESET}')
             else:
                 output.append(f'\x1b[{h};3H{MUTED}{clip(item["description"], w-4)}{RESET}')
             self.write(''.join(output))
@@ -327,7 +328,8 @@ class UI:
             rows, cols = self.size()
             fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', rows, cols, 0, 0))
             proc = subprocess.Popen(['bash', str(item['script'])], stdin=slave, stdout=slave, stderr=slave,
-                                    preexec_fn=child_tty, close_fds=True, bufsize=0)
+                                    preexec_fn=child_tty, close_fds=True, bufsize=0,
+                                    env=dict(os.environ, SHM_LANG=get_language()))
             os.close(slave)
             slave = -1
             while True:
@@ -409,7 +411,7 @@ class UI:
                 os.close(slave)
             os.close(master)
             self.write('\x1b[0m\x1b[?1000h\x1b[?1006h\x1b[?25l')
-            self.message = f'{item["name"]}: код {status if status is not None else "прерван"}'
+            self.message = f'{item["name"]}: {tr("код")} {status if status is not None else tr("прерван")}'
             self.dirty = True
 
     def handle(self, key):
@@ -471,9 +473,16 @@ class UI:
         elif key == '/':
             self.searching = True
             self.query = ''
+        elif key in ('l', 'L'):
+            try:
+                set_language('en' if get_language() == 'ru' else 'ru')
+                self.items = scan()
+                self.message = 'Language: English' if get_language() == 'en' else 'Язык: Русский'
+            except OSError as exc:
+                self.message = str(exc)
         elif key == 'r':
             self.items = scan()
-            self.message = 'Список обновлён.'
+            self.message = tr('Список обновлён.')
         return True
 
     def pop_event(self):
@@ -541,5 +550,5 @@ class UI:
 
 if __name__ == '__main__':
     if not sys.stdin.isatty() or not sys.stdout.isatty():
-        sys.exit('SHM нужен интерактивный терминал. Для списка: shm list')
+        sys.exit(tr('SHM нужен интерактивный терминал. Для списка: shm list'))
     UI().loop()

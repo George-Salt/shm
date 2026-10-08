@@ -1,6 +1,16 @@
 # Changelog / История изменений
 
-## Unreleased
+## 0.1.0 — 2026-10-08
+
+- English and Russian localization for the TUI, CLI, installer, and bundled plugins.
+- Persistent language selection with the `l` key, `shm lang`, and `SHM_LANG` overrides.
+- Localized plugin metadata and `shm --version`.
+- README badges, captured terminal screenshots, and installable release archives with checksums.
+- Language resolution, live switching, and safe plugin localization checks.
+
+Локализация интерфейса, CLI, установщика и встроенных плагинов; сохранение языка через `l` и `shm lang`, переменная SHM_LANG, двуязычные метаданные плагинов, версия приложения, бейджи и скриншоты README, архив релиза с контрольными суммами и проверки локализации.
+
+## Initial repository preparation
 
 - Initial public repository packaging for the existing SHM implementation.
 - English and Russian documentation, plugin guides, and contribution/security policies.

@@ -1,6 +1,6 @@
 # Plugin authoring
 
-[Русская версия](plugins.ru.md) · [README](../README.md)
+[Russian version](plugins.ru.md) · [README](../README.md)
 
 ## Layout
 
@@ -53,3 +53,16 @@ The installer copies the entire plugin directory, validates configuration and en
 SHM invokes the entry with Bash. CLI arguments are forwarded unchanged. Do not rely on the working directory being the plugin directory: derive resource paths from `${BASH_SOURCE[0]}`. Return zero on success and a nonzero exit status on failure. Check required external commands before use and confirm destructive actions explicitly.
 
 The fullscreen runner provides a PTY, but its output view is not a general terminal emulator. Use line-oriented output and prompts; test programs requiring cursor positioning or their own fullscreen UI with `shm run <id>`.
+
+## Localization
+
+Add `name.en`, `name.ru`, `description.en`, `description.ru`, `category.en`, and `category.ru` to `plugin.conf`. SHM selects the active language and falls back to the unsuffixed field when a translation is absent. The entry script receives `SHM_LANG=en` or `SHM_LANG=ru` from the CLI; the fullscreen runner also passes the resolved language. For example:
+
+```bash
+case "${SHM_LANG:-en}" in
+  ru) printf 'Привет!\n' ;;
+  *) printf 'Hello!\n' ;;
+esac
+```
+
+Bundled plugins source SHM's shared `i18n.sh` from two directories above their entry file. Keep their directory layout when installing them. Custom plugins can implement translations independently.

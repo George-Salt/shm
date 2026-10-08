@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
-for script in shm shm-cli install.sh plugin-install.sh plugins/*/main.sh tests/smoke.sh; do
+for script in shm shm-cli install.sh plugin-install.sh plugins/*/main.sh i18n.sh tools/build_release.sh tests/smoke.sh; do
   bash -n "$script"
 done
 python3 - <<'PY'
 import ast
 from pathlib import Path
-ast.parse(Path('tui.py').read_text())
+for path in ('tui.py', 'i18n.py', 'tools/build_catalog.py', 'tests/test_i18n.py'):
+    ast.parse(Path(path).read_text())
 PY
 sandbox="$(mktemp -d)"
 trap 'rm -rf -- "$sandbox"' EXIT
@@ -38,4 +39,31 @@ if bash plugin-install.sh "$sandbox/hello" >/dev/null 2>&1; then
   echo 'Invalid entry unexpectedly accepted' >&2
   exit 1
 fi
+# Both languages, persisted preferences, and environment overrides.
+for ident in cleanup bluetooth-speaker; do
+  bash plugin-install.sh "plugins/$ident"
+done
+unset SHM_LANG
+"$HOME/.local/bin/shm" lang en >/dev/null
+output="$("$HOME/.local/bin/shm" info cleanup)"
+grep -q 'System cleanup' <<< "$output"
+"$HOME/.local/bin/shm" lang ru >/dev/null
+output="$("$HOME/.local/bin/shm" info cleanup)"
+grep -q 'Очистка системы' <<< "$output"
+output="$(SHM_LANG=en "$HOME/.local/bin/shm" info cleanup)"
+grep -q 'System cleanup' <<< "$output"
+for language in en ru; do
+  output="$(printf 'n\n' | SHM_LANG="$language" bash "$SHM_HOME/plugins/cleanup/main.sh")"
+  if [[ "$language" == en ]]; then grep -q 'Cancelled.' <<< "$output"; else grep -q 'Отменено.' <<< "$output"; fi
+  # Stub hardware commands: verify localized Bluetooth errors without device operations.
+  mkdir -p "$sandbox/bin"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$sandbox/bin/bluetoothctl"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$sandbox/bin/wpctl"
+  chmod +x "$sandbox/bin/bluetoothctl" "$sandbox/bin/wpctl"
+  output="$(PATH="$sandbox/bin:$PATH" SHM_LANG="$language" bash "$SHM_HOME/plugins/bluetooth-speaker/main.sh" 2>&1)" && exit 1
+  if [[ "$language" == en ]]; then grep -q 'Unable to enable Bluetooth.' <<< "$output"; else grep -q 'Не удалось включить Bluetooth.' <<< "$output"; fi
+done
+"$HOME/.local/bin/shm" --version | grep -q 'SHM 0.1.0'
+python3 tests/test_i18n.py
+python3 tests/test_terminal.py
 printf 'Smoke checks passed.\n'

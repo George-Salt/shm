@@ -13,4 +13,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
+      - name: Check generated translation catalog
+        run: |
+          python3 tools/build_catalog.py
+          git diff --exit-code -- i18n.sh
       - run: bash tests/smoke.sh
