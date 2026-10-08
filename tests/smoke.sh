@@ -63,7 +63,8 @@ for language in en ru; do
   output="$(PATH="$sandbox/bin:$PATH" SHM_LANG="$language" bash "$SHM_HOME/plugins/bluetooth-speaker/main.sh" 2>&1)" && exit 1
   if [[ "$language" == en ]]; then grep -q 'Unable to enable Bluetooth.' <<< "$output"; else grep -q 'Не удалось включить Bluetooth.' <<< "$output"; fi
 done
-"$HOME/.local/bin/shm" --version | grep -q 'SHM 0.1.0'
+"$HOME/.local/bin/shm" --version | grep -Fq "SHM $(cat VERSION)"
 python3 tests/test_i18n.py
 python3 tests/test_terminal.py
+python3 tests/test_installer.py
 printf 'Smoke checks passed.\n'

@@ -1,5 +1,13 @@
 # Changelog / История изменений
 
+## 0.1.1 — 2026-10-08
+
+- Add an explicit bilingual language selector before interactive installer prompts.
+- Support `bash install.sh --lang en|ru` for scripted installation and save the selected language for the first application launch.
+- Verify English installation under a Russian locale and Russian installation under an English locale through real PTYs.
+
+Добавлен двуязычный выбор языка перед вопросами интерактивного установщика, параметр `--lang en|ru` и сохранение языка для первого запуска приложения. Проверяется установка на английском в русской локали и на русском в английской.
+
 ## 0.1.0 — 2026-10-08
 
 - English and Russian localization for the TUI, CLI, installer, and bundled plugins.

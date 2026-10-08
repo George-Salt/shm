@@ -29,14 +29,14 @@ Linux, Bash 4.4 or newer, Python 3.8 or newer, and standard GNU utilities. The f
 
 ## Installation
 
-### Install release v0.1.0
+### Install release v0.1.1
 
 Download and extract the release archive, then run the included installer:
 
 ```bash
-curl -fLO https://github.com/George-Salt/shm/releases/download/v0.1.0/shm-0.1.0.tar.gz
-tar -xzf shm-0.1.0.tar.gz
-cd shm-0.1.0
+curl -fLO https://github.com/George-Salt/shm/releases/download/v0.1.1/shm-0.1.1.tar.gz
+tar -xzf shm-0.1.1.tar.gz
+cd shm-0.1.1
 bash install.sh
 ```
 
@@ -60,7 +60,7 @@ export PATH="$HOME/.local/bin:$PATH"
 fish_add_path ~/.local/bin
 ```
 
-Start a new shell, then run `shm`. The installer asks whether to install bundled plugins. Non-interactive installation skips them. Re-running the installer updates application files and leaves installed plugins in place, apart from a legacy migration that removes the old `alice` plugin when it matches the installer’s signature.
+Start a new shell, then run `shm`. Interactive installation first asks you to choose English or Russian, then asks whether to install bundled plugins. The selected language is saved for the application. Use `bash install.sh --lang en` or `bash install.sh --lang ru` to select it explicitly and skip the language prompt. An explicit `SHM_LANG` also skips the prompt. Non-interactive installation skips them. Re-running the installer updates application files and leaves installed plugins in place, apart from a legacy migration that removes the old `alice` plugin when it matches the installer’s signature.
 
 ## Usage
 
